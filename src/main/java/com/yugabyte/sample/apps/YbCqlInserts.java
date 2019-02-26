@@ -30,7 +30,7 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
  * This workload writes and reads some random string keys from a CQL server. By default, this app
  * inserts a million keys, and reads/updates them indefinitely.
  */
-public class CassandraKeyValue extends CassandraKeyValueBase {
+public class YbCqlInserts extends CassandraKeyValueBase {
 
   // The default table name to create and use for CRUD ops.
   private static final String DEFAULT_TABLE_NAME = CassandraKeyValue.class.getSimpleName();
@@ -53,7 +53,7 @@ public class CassandraKeyValue extends CassandraKeyValueBase {
    }
 
   protected PreparedStatement getPreparedInsert() {
-    return getPreparedInsert(String.format("INSERT INTO %s (k, v) VALUES (?, ?);", getTableName()));
+    return getPreparedInsert(String.format("INSERT INTO %s (k, v) VALUES (?, ?) IF NOT EXISTS;", getTableName()));
   }
 
   @Override

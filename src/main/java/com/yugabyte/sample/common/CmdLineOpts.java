@@ -44,7 +44,6 @@ public class CmdLineOpts {
 
   // The various apps present in this sample.
   public static enum AppName {
-    CassandraKeyValue,
     CassandraRangeKeyValue,
     CassandraBatchKeyValue,
     CassandraBatchTimeseries,
@@ -58,6 +57,7 @@ public class CmdLineOpts {
     CrSqlUpdates,
     CrSqlSecondaryIndex,
     CrSqlSnapshotTxns,
+    YbCqlInserts,
   }
 
   // The class type of the app needed to spawn new objects.
