@@ -25,8 +25,8 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
 /**
  * This workload writes and reads some random string keys from a postgresql table.
  */
-public class SqlSecondaryIndex extends AppBase {
-  private static final Logger LOG = Logger.getLogger(SqlSecondaryIndex.class);
+public class CrSqlInserts extends AppBase {
+  private static final Logger LOG = Logger.getLogger(CrSqlInserts.class);
 
   // Static initialization of this workload's config. These are good defaults for getting a decent
   // read dominated workload on a reasonably powered machine. Exact IOPS will of course vary
@@ -34,8 +34,8 @@ public class SqlSecondaryIndex extends AppBase {
   static {
     // Disable the read-write percentage.
     appConfig.readIOPSPercentage = -1;
-    // Set the read and write threads to 1 each.
-    appConfig.numReaderThreads = 24;
+    // Set the read and write threads to 2 each.
+    appConfig.numReaderThreads = 2;
     appConfig.numWriterThreads = 2;
     // The number of keys to read.
     appConfig.numKeysToRead = -1;
@@ -47,7 +47,7 @@ public class SqlSecondaryIndex extends AppBase {
   }
 
   // The default table name to create and use for CRUD ops.
-  private static final String DEFAULT_TABLE_NAME = "SqlSecondaryIndex";
+  private static final String DEFAULT_TABLE_NAME = "PostgresqlKeyValue";
 
   // The shared prepared select statement for fetching the data.
   private volatile PreparedStatement preparedSelect = null;
@@ -58,7 +58,7 @@ public class SqlSecondaryIndex extends AppBase {
   // Lock for initializing prepared statement objects.
   private static final Object prepareInitLock = new Object();
 
-  public SqlSecondaryIndex() {
+  public CrSqlInserts() {
     buffer = new byte[appConfig.valueSize];
   }
 
@@ -67,14 +67,14 @@ public class SqlSecondaryIndex extends AppBase {
    */
   @Override
   public void dropTable() throws Exception {
-    Connection connection = getPostgresConnection();
-    connection.createStatement().execute("DROP TABLE IF EXISTS " + getTableName());
+    Connection connection = getCrDBConnection();
+    connection.createStatement().execute("DROP TABLE " + getTableName());
     LOG.info(String.format("Dropped table: %s", getTableName()));
   }
 
   @Override
   public void createTablesIfNeeded() throws Exception {
-    Connection connection = getPostgresConnection();
+    Connection connection = getCrDBConnection();
 
     // Check if database already exists.
     connection.createStatement().execute(
@@ -82,19 +82,13 @@ public class SqlSecondaryIndex extends AppBase {
     connection.close();
 
     // Connect to the new database just created.
-    connection = getPostgresConnection(postgres_ybdemo_database);
+    connection = getCrDBConnection(postgres_ybdemo_database);
 
     // Create the table.
-    connection.createStatement().executeUpdate(
-        String.format("CREATE TABLE IF NOT EXISTS %s (k varchar PRIMARY KEY, v varchar);",
+    connection.createStatement().execute(
+        String.format("CREATE TABLE IF NOT EXISTS %s (k text PRIMARY KEY, v text);",
             getTableName()));
     LOG.info(String.format("Created table: %s", getTableName()));
-
-    // Create an index on the table.
-    connection.createStatement().executeUpdate(
-        String.format("CREATE INDEX IF NOT EXISTS %s_index ON %s(v);",
-            getTableName(), getTableName()));
-    LOG.info(String.format("Created index on table: %s", getTableName()));
   }
 
   public String getTableName() {
@@ -104,8 +98,11 @@ public class SqlSecondaryIndex extends AppBase {
 
   private PreparedStatement getPreparedSelect() throws Exception {
     if (preparedSelect == null) {
-      preparedSelect = getPostgresConnection(postgres_ybdemo_database).prepareStatement(
-          String.format("SELECT k, v FROM %s WHERE v = ?;", getTableName()));
+      preparedSelect = getCrDBConnection(postgres_ybdemo_database).prepareStatement(
+          String.format("SELECT k, v FROM %s WHERE k = ?;", getTableName()));
+      // TODO disable server-side prepare until we handle predicate pushdown with bind-vars better.
+      org.postgresql.PGStatement pgstmt = (org.postgresql.PGStatement)preparedSelect;
+      pgstmt.setUseServerPrepare(false);
     }
     return preparedSelect;
   }
@@ -120,22 +117,23 @@ public class SqlSecondaryIndex extends AppBase {
 
     try {
       PreparedStatement statement = getPreparedSelect();
-      statement.setString(1, key.getValueStr());
-      ResultSet rs = statement.executeQuery();
-      if (!rs.next()) {
-        LOG.fatal("Read key: " + key.asString() + " expected 1 row in result, got 0");
-        return 0;
-      }
+      statement.setString(1, key.asString());
+      try (ResultSet rs = statement.executeQuery()) {
+        if (!rs.next()) {
+          LOG.fatal("Read key: " + key.asString() + " expected 1 row in result, got 0");
+          return 0;
+        }
 
-      if (!key.asString().equals(rs.getString("k"))) {
-        LOG.fatal("Read key: " + key.asString() + ", got " + rs.getString("k"));
-      }
-      LOG.debug("Read key: " + key.toString());
+        if (!key.asString().equals(rs.getString("k"))) {
+          LOG.fatal("Read key: " + key.asString() + ", got " + rs.getString("k"));
+        }
+        LOG.debug("Read key: " + key.toString());
 
-      if (rs.next()) {
-        LOG.fatal("Read key: " + key.asString() +
-            " expected 1 row in result, got more than one");
-        return 0;
+        if (rs.next()) {
+          LOG.fatal("Read key: " + key.asString() +
+                        " expected 1 row in result, got more than one");
+          return 0;
+        }
       }
     } catch (Exception e) {
       LOG.fatal("Failed reading value: " + key.getValueStr(), e);
@@ -146,7 +144,7 @@ public class SqlSecondaryIndex extends AppBase {
 
   private PreparedStatement getPreparedInsert() throws Exception {
     if (preparedInsert == null) {
-      preparedInsert = getPostgresConnection(postgres_ybdemo_database).prepareStatement(
+      preparedInsert = getCrDBConnection(postgres_ybdemo_database).prepareStatement(
           String.format("INSERT INTO %s (k, v) VALUES (?, ?);", getTableName()));
     }
     return preparedInsert;
@@ -179,7 +177,7 @@ public class SqlSecondaryIndex extends AppBase {
   @Override
   public List<String> getWorkloadDescription() {
     return Arrays.asList(
-        "Sample key-value app built on postgresql. The app writes out unique string keys",
+        "Sample key-value app built on PostgreSQL with concurrent readers and writers. The app inserts unique string keys",
         "each with a string value to a postgres table with an index on the value column.",
         "There are multiple readers and writers that update these keys and read them",
         "indefinitely, with the readers query the keys by the associated values that are",

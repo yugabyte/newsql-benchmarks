@@ -123,15 +123,15 @@ public abstract class AppBase implements MetricsTracker.StatusMessageAppender {
     return cassandra_session;
   }
 
-  protected Connection getPostgresConnection() throws Exception {
-    return getPostgresConnection(appConfig.defaultPostgresDatabase);
+  protected Connection getCrDBConnection() throws Exception {
+    return getCrDBConnection(appConfig.defaultPostgresDatabase);
   }
 
-  protected Connection getPostgresConnection(String database) throws Exception {
+  protected Connection getCrDBConnection(String database) throws Exception {
     Class.forName("org.postgresql.Driver");
     ContactPoint contactPoint = getRandomContactPoint();
     Properties props = new Properties();
-    props.setProperty("user", "postgres");
+    props.setProperty("user", "root");
     props.setProperty("sslmode", "disable");
     String connectStr = String.format("jdbc:postgresql://%s:%d/%s", contactPoint.getHost(),
                                                                     contactPoint.getPort(),

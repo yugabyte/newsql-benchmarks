@@ -25,8 +25,8 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
 /**
  * This workload writes and reads some random string keys from a postgresql table.
  */
-public class SqlSnapshotTxns extends AppBase {
-  private static final Logger LOG = Logger.getLogger(SqlSnapshotTxns.class);
+public class CrSqlUpdates extends AppBase {
+  private static final Logger LOG = Logger.getLogger(CrSqlUpdates.class);
 
   // Static initialization of this workload's config. These are good defaults for getting a decent
   // read dominated workload on a reasonably powered machine. Exact IOPS will of course vary
@@ -47,7 +47,7 @@ public class SqlSnapshotTxns extends AppBase {
   }
 
   // The default table name to create and use for CRUD ops.
-  private static final String DEFAULT_TABLE_NAME = "SqlSnapshotTxns";
+  private static final String DEFAULT_TABLE_NAME = "PostgresqlKeyValue";
 
   // The shared prepared select statement for fetching the data.
   private volatile PreparedStatement preparedSelect = null;
@@ -58,7 +58,7 @@ public class SqlSnapshotTxns extends AppBase {
   // Lock for initializing prepared statement objects.
   private static final Object prepareInitLock = new Object();
 
-  public SqlSnapshotTxns() {
+  public CrSqlUpdates() {
     buffer = new byte[appConfig.valueSize];
   }
 
@@ -67,26 +67,26 @@ public class SqlSnapshotTxns extends AppBase {
    */
   @Override
   public void dropTable() throws Exception {
-    Connection connection = getPostgresConnection();
-    connection.createStatement().execute("DROP TABLE IF EXISTS " + getTableName());
+    Connection connection = getCrDBConnection();
+    connection.createStatement().execute("DROP TABLE " + getTableName());
     LOG.info(String.format("Dropped table: %s", getTableName()));
   }
 
   @Override
   public void createTablesIfNeeded() throws Exception {
-    Connection connection = getPostgresConnection();
+    Connection connection = getCrDBConnection();
 
     // Check if database already exists.
     connection.createStatement().execute(
-      String.format("CREATE DATABASE IF NOT EXISTS %s", postgres_ybdemo_database));
+      String.format("CREATE DATABASE %s", postgres_ybdemo_database));
     connection.close();
 
     // Connect to the new database just created.
-    connection = getPostgresConnection(postgres_ybdemo_database);
+    connection = getCrDBConnection(postgres_ybdemo_database);
 
     // Create the table.
     connection.createStatement().executeUpdate(
-        String.format("CREATE TABLE IF NOT EXISTS %s (k varchar PRIMARY KEY, v varchar);",
+        String.format("CREATE TABLE %s (k varchar PRIMARY KEY, v varchar);",
             getTableName()));
     LOG.info(String.format("Created table: %s", getTableName()));
   }
@@ -98,7 +98,7 @@ public class SqlSnapshotTxns extends AppBase {
 
   private PreparedStatement getPreparedSelect() throws Exception {
     if (preparedSelect == null) {
-      preparedSelect = getPostgresConnection(postgres_ybdemo_database).prepareStatement(
+      preparedSelect = getCrDBConnection(postgres_ybdemo_database).prepareStatement(
           String.format("SELECT k, v FROM %s WHERE k = ?;", getTableName()));
     }
     return preparedSelect;
@@ -138,13 +138,10 @@ public class SqlSnapshotTxns extends AppBase {
     return 1;
   }
 
-  private PreparedStatement getPreparedInsert() throws Exception {
-    String stmt = "BEGIN ISOLATION LEVEL SNAPSHOT;" + 
-                  String.format("INSERT INTO %s (k, v) VALUES (?, ?);", getTableName()) +
-                  String.format("INSERT INTO %s (k, v) VALUES (?, ?);", getTableName()) +
-                  "COMMIT;";
+  private PreparedStatement getPreparedUpdate() throws Exception {
     if (preparedInsert == null) {
-      preparedInsert = getPostgresConnection(postgres_ybdemo_database).prepareStatement(stmt);
+      preparedInsert = getCrDBConnection(postgres_ybdemo_database).prepareStatement(
+          String.format("UPDATE %s SET v=? WHERE k=?;", getTableName()));
     }
     return preparedInsert;
   }
@@ -158,19 +155,15 @@ public class SqlSnapshotTxns extends AppBase {
 
     int result = 0;
     try {
-      PreparedStatement statement = getPreparedInsert();
+      PreparedStatement statement = getPreparedUpdate();
       // Prefix hashcode to ensure generated keys are random and not sequential.
       statement.setString(1, key.asString());
-      statement.setString(2, key.getValueStr());
-      statement.setString(3, key.asString() + "-copy");
-      statement.setString(4, key.getValueStr());
+      statement.setString(2, key.getValueStr() + ":" + System.currentTimeMillis());
       result = statement.executeUpdate();
       LOG.debug("Wrote key: " + key.asString() + ", " + key.getValueStr() + ", return code: " +
-                result);
-      getSimpleLoadGenerator().recordWriteSuccess(key);
+          result);
       return 1;
     } catch (Exception e) {
-      getSimpleLoadGenerator().recordWriteFailure(key);
       LOG.fatal("Failed writing key: " + key.asString(), e);
     }
     return 0;
@@ -179,7 +172,7 @@ public class SqlSnapshotTxns extends AppBase {
   @Override
   public List<String> getWorkloadDescription() {
     return Arrays.asList(
-        "Sample key-value app built on postgresql. The app writes out unique string keys",
+        "Sample key-value app built on PostgreSQL with concurrent readers and writers. The app updates existing string keys",
         "each with a string value to a postgres table with an index on the value column.",
         "There are multiple readers and writers that update these keys and read them",
         "indefinitely, with the readers query the keys by the associated values that are",

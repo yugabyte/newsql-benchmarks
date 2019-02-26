@@ -44,27 +44,20 @@ public class CmdLineOpts {
 
   // The various apps present in this sample.
   public static enum AppName {
-    CassandraHelloWorld,
     CassandraKeyValue,
     CassandraRangeKeyValue,
     CassandraBatchKeyValue,
     CassandraBatchTimeseries,
     CassandraTransactionalKeyValue,
     CassandraTransactionalRestartRead,
-    CassandraStockTicker,
     CassandraTimeseries,
     CassandraUserId,
-    CassandraPersonalization,
     CassandraSecondaryIndex,
     CassandraUniqueSecondaryIndex,
-    RedisKeyValue,
-    RedisPipelinedKeyValue,
-    RedisHashPipelined,
-    RedisYBClientKeyValue,
-    SqlInserts,
-    SqlUpdates,
-    SqlSecondaryIndex,
-    SqlSnapshotTxns,
+    CrSqlInserts,
+    CrSqlUpdates,
+    CrSqlSecondaryIndex,
+    CrSqlSnapshotTxns,
   }
 
   // The class type of the app needed to spawn new objects.
@@ -169,30 +162,6 @@ public class CmdLineOpts {
       }
       LOG.info("Batch size : " + AppBase.appConfig.cassandraBatchSize);
     }
-    if (appName == AppName.CassandraPersonalization) {
-      if (commandLine.hasOption("num_stores")) {
-        AppBase.appConfig.numStores = Integer.parseInt(commandLine.getOptionValue("num_stores"));
-      }
-      LOG.info("CassandraPersonalization number of stores : " + AppBase.appConfig.numStores);
-      if (commandLine.hasOption("num_new_coupons_per_customer")) {
-        AppBase.appConfig.numNewCouponsPerCustomer =
-          Integer.parseInt(commandLine.getOptionValue("num_new_coupons_per_customer"));
-      }
-      LOG.info("CassandraPersonalization number of new coupons per costomer : " +
-               AppBase.appConfig.numNewCouponsPerCustomer);
-      if (commandLine.hasOption("max_coupons_per_customer")) {
-        AppBase.appConfig.maxCouponsPerCustomer =
-          Integer.parseInt(commandLine.getOptionValue("max_coupons_per_customer"));
-      }
-      if (AppBase.appConfig.numNewCouponsPerCustomer >
-          AppBase.appConfig.maxCouponsPerCustomer) {
-        LOG.fatal(
-            "The number of new coupons cannot exceed the maximum number of coupons per customer");
-        System.exit(-1);
-      }
-      LOG.info("CassandraPersonalization maximum number of coupons per costomer : " +
-               AppBase.appConfig.maxCouponsPerCustomer);
-    }
     if (appName == AppName.CassandraSecondaryIndex) {
       if (commandLine.hasOption("non_transactional_index")) {
         AppBase.appConfig.nonTransactionalIndex = true;
@@ -202,63 +171,6 @@ public class CmdLineOpts {
         AppBase.appConfig.batchWrite = true;
       }
       LOG.info("CassandraSecondaryIndex batch write");
-    }
-    if (appName == AppName.RedisPipelinedKeyValue ||
-        appName == AppName.RedisHashPipelined) {
-      if (commandLine.hasOption("pipeline_length")) {
-        AppBase.appConfig.redisPipelineLength =
-            Integer.parseInt(commandLine.getOptionValue("pipeline_length"));
-        if (AppBase.appConfig.redisPipelineLength > AppBase.appConfig.numUniqueKeysToWrite) {
-          LOG.fatal("The pipeline length cannot be more than the number of unique keys");
-          System.exit(-1);
-        }
-      }
-      LOG.info("RedisPipelinedKeyValue pipeline length : " + AppBase.appConfig.redisPipelineLength);
-    }
-    if (appName == AppName.RedisHashPipelined) {
-      if (commandLine.hasOption("num_subkeys_per_key")) {
-        AppBase.appConfig.numSubkeysPerKey =
-            Integer.parseInt(commandLine.getOptionValue("num_subkeys_per_key"));
-        if (AppBase.appConfig.redisPipelineLength >
-            AppBase.appConfig.numUniqueKeysToWrite) {
-          LOG.fatal("The pipeline length cannot be more than the number of unique keys");
-          System.exit(-1);
-        }
-      }
-      if (commandLine.hasOption("key_freq_zipf_exponent")) {
-        AppBase.appConfig.keyUpdateFreqZipfExponent = Double.parseDouble(
-            commandLine.getOptionValue("key_freq_zipf_exponent"));
-      }
-      if (commandLine.hasOption("subkey_freq_zipf_exponent")) {
-        AppBase.appConfig.subkeyUpdateFreqZipfExponent = Double.parseDouble(
-            commandLine.getOptionValue("subkey_freq_zipf_exponent"));
-      }
-      if (commandLine.hasOption("subkey_value_size_zipf_exponent")) {
-        AppBase.appConfig.valueSizeZipfExponent = Double.parseDouble(
-            commandLine.getOptionValue("subkey_value_size_zipf_exponent"));
-      }
-      if (commandLine.hasOption("subkey_value_max_size")) {
-        AppBase.appConfig.maxValueSize = Integer.parseInt(
-            commandLine.getOptionValue("subkey_value_max_size"));
-      }
-      if (commandLine.hasOption("num_subkeys_per_write")) {
-        AppBase.appConfig.numSubkeysPerWrite = Integer.parseInt(
-            commandLine.getOptionValue("num_subkeys_per_write"));
-        if (AppBase.appConfig.numSubkeysPerWrite >
-            AppBase.appConfig.numSubkeysPerKey) {
-          LOG.fatal("Writing more subkeys than the number of subkeys per key.");
-          System.exit(-1);
-        }
-      }
-      if (commandLine.hasOption("num_subkeys_per_read")) {
-        AppBase.appConfig.numSubkeysPerRead = Integer.parseInt(
-            commandLine.getOptionValue("num_subkeys_per_read"));
-        if (AppBase.appConfig.numSubkeysPerRead >
-            AppBase.appConfig.numSubkeysPerKey) {
-          LOG.fatal("Writing more subkeys than the number of subkeys per key.");
-          System.exit(-1);
-        }
-      }
     }
     if (commandLine.hasOption("with_local_dc")) {
       if (AppBase.appConfig.disableYBLoadBalancingPolicy == true) {
