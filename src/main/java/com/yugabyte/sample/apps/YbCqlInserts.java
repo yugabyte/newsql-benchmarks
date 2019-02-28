@@ -33,7 +33,7 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
 public class YbCqlInserts extends CassandraKeyValueBase {
 
   // The default table name to create and use for CRUD ops.
-  private static final String DEFAULT_TABLE_NAME = CassandraKeyValue.class.getSimpleName();
+  private static final String DEFAULT_TABLE_NAME = YbCqlInserts.class.getSimpleName();
 
   @Override
   public List<String> getCreateTableStatements() {

@@ -30,7 +30,7 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
  * During read with pick random key and check that it's value at least is as big as was stored
  * before read started.
  */
-public class CassandraTransactionalRestartRead extends CassandraKeyValue {
+public class CassandraTransactionalRestartRead extends YbCqlInserts {
   private static final Logger LOG = Logger.getLogger(CassandraTransactionalRestartRead.class);
   // The default table name to create and use for CRUD ops.
   private static final String DEFAULT_TABLE_NAME =

@@ -31,7 +31,7 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
  * on a non-primary-key column. When it reads a key, it queries the key by its associated value
  * which is indexed.
  */
-public class CassandraSecondaryIndex extends CassandraKeyValue {
+public class CassandraSecondaryIndex extends YbCqlInserts {
   private static final Logger LOG = Logger.getLogger(CassandraSecondaryIndex.class);
 
   // Static initialization of this workload's config. These are good defaults for getting a decent

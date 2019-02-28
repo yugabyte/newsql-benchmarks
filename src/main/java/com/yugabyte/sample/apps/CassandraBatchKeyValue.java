@@ -29,7 +29,7 @@ import com.yugabyte.sample.common.SimpleLoadGenerator.Key;
  * This workload writes and reads some random string keys from a CQL server in batches. By default,
  * this app inserts a million keys, and reads/updates them indefinitely.
  */
-public class CassandraBatchKeyValue extends CassandraKeyValue {
+public class CassandraBatchKeyValue extends YbCqlInserts {
   private static final Logger LOG = Logger.getLogger(CassandraBatchKeyValue.class);
 
   // Static initialization of this workload's config.
